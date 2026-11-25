@@ -1,6 +1,6 @@
 # ChatGPT Plus/Pro and Codex Pop-Up Blocker
 
-This is a Tampermonkey userscript to hide/block ChatGPT's dismissible upsell and announcement banners (e.g. "Upgrade to Plus," "Upgrade to Pro," "Meet Codex in the desktop app") on any desktop browser.
+This is a Tampermonkey userscript to hide/block ChatGPT's dismissible upsell and announcement banners (e.g. "Upgrade to Plus," "Upgrade to Pro," "Meet Codex in the desktop app") and the inline "As this conversation gets longer... Upgrade for more context" upsell on any desktop browser.
 
 ChatGPT renders these as banners above the message composer, and they reappear periodically no matter how many times you dismiss them. Rather than chase the wording of each new one individually, this script recognizes the underlying component ChatGPT reuses for all of them, so it catches Plus, Pro, Codex, and future promos alike, along with the standalone "Upgrade" buttons in the header and sidebar.
 
@@ -23,8 +23,9 @@ ChatGPT builds every one of these dismissible promo banners (Plus, Pro, Codex, a
 2. As a fallback, looks for the general shape these banners share even when the labeling differs: some dismiss/close button (by `aria-label`) paired with some call-to-action-looking button (matched loosely against patterns like "Get/Go/Try Plus," "Upgrade," "Try ... free," "Meet Codex," "Download the app").
 3. Falls back further to a plain-text phrase match (`NAG_PHRASES`) against the banner's full text, for the rare case one ships without a recognizable dismiss or CTA button at all.
 4. Hides any matched `<aside>` with `display: none !important` — both immediately via an injected CSS rule keyed on the same "banner" aria-label pattern (so there's no flash before JavaScript runs), and via a JavaScript pass for anything the CSS selector alone doesn't catch.
-5. Separately hides any standalone "Upgrade" button/pill in the top-right header actions or the sidebar footer, matched by `aria-label="Upgrade"` or by exact button text ("Upgrade," "Get Plus," "Go Plus").
-6. Uses a `MutationObserver` to re-run all of the above as you navigate and as ChatGPT's React app re-renders content, so newly-appearing banners get hidden without a page reload.
+5. Separately hides any standalone upgrade button/pill (header actions, sidebar footer, or inline in a conversation), matched by `aria-label="Upgrade"` or by the button's full text via a pattern (`UPGRADE_BUTTON_RE`) covering "Upgrade," "Upgrade to Plus/Pro," "Get/Go/Try Plus/Pro," and "Try Plus free."
+6. Handles the inline upsell that appears inside long conversations ("As this conversation gets longer, ChatGPT may lose track of details... Upgrade for more context in every conversation" with an "Upgrade to Plus" button). That block isn't a banner and has no dismiss button, but it sits in a `role="status"` live region, so when an upgrade button is found inside one, the whole region (text and button) is hidden, along with its now-empty parent so no blank spacing is left. A phrase check (`NAG_PHRASES`) also hides any `role="status"` block containing known upsell wording, even if the button text changes.
+7. Uses a `MutationObserver` to re-run all of the above as you navigate and as ChatGPT's React app re-renders content, so newly-appearing banners get hidden without a page reload.
 
 ## NOTE
 

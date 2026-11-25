@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - Hide Promo/Upgrade Nag Banners
 // @namespace    https://github.com/HenryKredatus/ChatGPT-Plus-Pro-and-Codex-Pop-Up-Blocker
-// @version      3.0.0
-// @description  Hides ChatGPT's dismissible promo banners above the composer (Upgrade to Plus, Upgrade to Pro, Meet Codex, etc.) and the Upgrade buttons in the header/sidebar.
+// @version      3.1.0
+// @description  Hides ChatGPT's dismissible promo banners above the composer (Upgrade to Plus, Upgrade to Pro, Meet Codex, etc.), the inline "conversation gets longer" upsell, and the Upgrade buttons in the header/sidebar.
 // @author       HenryKredatus
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -19,7 +19,7 @@
   // This ALWAYS prints, regardless of any debug flag, so you can confirm
   // this exact script version is actually the one running.
   console.log(
-    "%c[hide-chatgpt-nags] v3.0.0 loaded on " + location.href,
+    "%c[hide-chatgpt-nags] v3.1.0 loaded on " + location.href,
     "color: #0a0; font-weight: bold;",
   );
 
@@ -46,6 +46,8 @@
     "upgrade plan",
     "try plus free",
     "try pro free",
+    "upgrade for more context",
+    "lose track of details from earlier in the chat",
   ];
 
   // CTA button text patterns that show up on these banners' primary buttons
@@ -117,6 +119,25 @@
   `;
   document.documentElement.appendChild(style);
 
+  // Buttons whose whole label is an upgrade call-to-action, e.g. "Upgrade",
+  // "Upgrade to Plus", "Get Plus", "Go Pro", "Try Plus free".
+  const UPGRADE_BUTTON_RE =
+    /^(upgrade( (to|plan))?( (plus|pro|go|team|business))?|(get|go|try) (plus|pro|go|team)( free)?)$/i;
+
+  // Hides an element, and also its parent when that parent holds nothing
+  // else, so no empty margin/spacing is left behind.
+  function hideWithEmptyParent(el) {
+    el.style.setProperty("display", "none", "important");
+    const parent = el.parentElement;
+    if (
+      parent &&
+      parent.children.length === 1 &&
+      !["BODY", "MAIN", "HTML"].includes(parent.tagName)
+    ) {
+      parent.style.setProperty("display", "none", "important");
+    }
+  }
+
   function hideUpgradeNags(root = document) {
     // 1) The dismissible promo banners above the composer.
     root.querySelectorAll("aside").forEach((aside) => {
@@ -134,11 +155,27 @@
     });
 
     root.querySelectorAll("button").forEach((btn) => {
-      const label = (btn.textContent || "").trim().toLowerCase();
-      if (label === "upgrade" || label === "get plus" || label === "go plus") {
-        const wrapper = btn.closest("div") || btn;
-        wrapper.style.setProperty("display", "none", "important");
+      const label = (btn.textContent || "").trim();
+      if (!UPGRADE_BUTTON_RE.test(label)) return;
+
+      // Inline upsells inside the conversation (e.g. "As this conversation
+      // gets longer... Upgrade for more context") live in a role="status"
+      // live region together with their explanatory text. Hide the whole
+      // region so the text doesn't get left behind without its button.
+      const status = btn.closest('[role="status"]');
+      if (status) {
+        hideWithEmptyParent(status);
+        return;
       }
+
+      const wrapper = btn.closest("div") || btn;
+      wrapper.style.setProperty("display", "none", "important");
+    });
+
+    // 3) Inline upsell text blocks that match a known phrase, even if their
+    //    button wording changes or the button is missing.
+    root.querySelectorAll('[role="status"]').forEach((el) => {
+      if (textMatchesNag(el)) hideWithEmptyParent(el);
     });
   }
 
